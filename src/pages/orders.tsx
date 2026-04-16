@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { MobileLayout } from "../components/layout";
-import { ClipboardList, ChevronRight, RotateCcw } from "lucide-react";
+import { ClipboardList, RotateCcw, Heart } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { motion } from "framer-motion";
 
@@ -55,16 +55,18 @@ export default function Orders() {
   };
 
   return (
-    <MobileLayout title="历史订单" showBack>
+    <MobileLayout title="甜蜜回忆" showBack>
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[60vh] text-center px-6">
-          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+          <div className="w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6">
             <ClipboardList className="w-10 h-10 text-muted-foreground/50" />
           </div>
-          <h2 className="text-xl font-bold mb-2">还没有历史订单</h2>
-          <p className="text-muted-foreground mb-8">去点一份好吃的吧</p>
+          <h2 className="text-xl font-bold mb-2">还没有甜蜜回忆</h2>
+          <p className="text-muted-foreground mb-8 flex items-center gap-1">
+            去点一份好吃的 <Heart className="w-4 h-4 text-primary fill-primary" /> 吧
+          </p>
           <Link href="/">
-            <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/20">
+            <button className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/30">
               去浏览菜单
             </button>
           </Link>
@@ -77,7 +79,7 @@ export default function Orders() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="bg-card rounded-2xl p-4 border border-card-border shadow-sm"
+              className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 border border-card-border shadow-sm"
             >
               {/* Order Header */}
               <div className="flex items-center justify-between mb-3">
@@ -109,7 +111,7 @@ export default function Orders() {
                 <Link href="/">
                   <button
                     onClick={() => reorder(order)}
-                    className="flex items-center gap-1 text-xs text-primary font-medium border border-primary/30 rounded-full px-3 py-1.5 active:scale-95 transition-transform hover:bg-primary/5"
+                    className="flex items-center gap-1 text-xs text-primary font-medium border border-primary/30 rounded-full px-3 py-1.5 active:scale-95 transition-transform hover:bg-primary/10"
                   >
                     <RotateCcw className="w-3 h-3" />
                     再来一单

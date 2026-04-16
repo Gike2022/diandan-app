@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useCart } from "../context/CartContext";
 import { MobileLayout } from "../components/layout";
-import { CheckCircle2, MapPin, Phone, User, MessageSquare } from "lucide-react";
+import { CheckCircle2, MapPin, Phone, User, MessageSquare, Heart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { saveOrder } from "./orders";
 
@@ -55,14 +55,17 @@ export default function Checkout() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", damping: 15 }}
-            className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6"
+            className="w-20 h-20 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6"
           >
             <CheckCircle2 className="w-10 h-10" />
           </motion.div>
           <h2 className="text-2xl font-bold mb-2">订单已提交！</h2>
-          <p className="text-muted-foreground mb-8">感谢您的惠顾，厨房正在火速准备中...</p>
+          <p className="text-muted-foreground mb-8 flex items-center gap-1">
+            感谢您的惠顾，厨房正在火速准备中...
+            <Heart className="w-4 h-4 text-primary fill-primary" />
+          </p>
           <Link href="/">
-            <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/20">
+            <button className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/30">
               返回首页
             </button>
           </Link>
@@ -81,10 +84,10 @@ export default function Checkout() {
       <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-36">
 
         {/* Delivery Info */}
-        <div className="bg-card rounded-2xl p-5 shadow-sm border border-card-border space-y-4">
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-card-border space-y-4">
           <h3 className="font-bold text-lg mb-2">配送信息</h3>
           <div className="space-y-3">
-            <div className="flex items-center gap-3 bg-muted/50 rounded-xl p-3 border border-border/50 focus-within:border-primary focus-within:bg-background transition-colors">
+            <div className="flex items-center gap-3 bg-muted/30 rounded-xl p-3 border border-border/30 focus-within:border-primary focus-within:bg-background/50 transition-colors">
               <User className="w-5 h-5 text-muted-foreground shrink-0" />
               <input
                 type="text"
@@ -95,7 +98,7 @@ export default function Checkout() {
                 required
               />
             </div>
-            <div className="flex items-center gap-3 bg-muted/50 rounded-xl p-3 border border-border/50 focus-within:border-primary focus-within:bg-background transition-colors">
+            <div className="flex items-center gap-3 bg-muted/30 rounded-xl p-3 border border-border/30 focus-within:border-primary focus-within:bg-background/50 transition-colors">
               <Phone className="w-5 h-5 text-muted-foreground shrink-0" />
               <input
                 type="tel"
@@ -106,7 +109,7 @@ export default function Checkout() {
                 required
               />
             </div>
-            <div className="flex items-start gap-3 bg-muted/50 rounded-xl p-3 border border-border/50 focus-within:border-primary focus-within:bg-background transition-colors">
+            <div className="flex items-start gap-3 bg-muted/30 rounded-xl p-3 border border-border/30 focus-within:border-primary focus-within:bg-background/50 transition-colors">
               <MapPin className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
               <textarea
                 placeholder="详细地址 (如: xx路xx小区x号楼x单元)"
@@ -116,7 +119,7 @@ export default function Checkout() {
                 required
               />
             </div>
-            <div className="flex items-start gap-3 bg-muted/50 rounded-xl p-3 border border-border/50 focus-within:border-primary focus-within:bg-background transition-colors">
+            <div className="flex items-start gap-3 bg-muted/30 rounded-xl p-3 border border-border/30 focus-within:border-primary focus-within:bg-background/50 transition-colors">
               <MessageSquare className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
               <textarea
                 placeholder="备注 (如: 少辣、不加葱、餐具x2…)"
@@ -129,7 +132,7 @@ export default function Checkout() {
         </div>
 
         {/* Order Summary */}
-        <div className="bg-card rounded-2xl p-5 shadow-sm border border-card-border">
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-card-border">
           <h3 className="font-bold text-lg mb-4">订单详情</h3>
           <div className="space-y-3 mb-4">
             {cart.map(item => (
@@ -153,7 +156,7 @@ export default function Checkout() {
         </div>
 
         {/* Payment Section */}
-        <div className="bg-card rounded-2xl p-5 shadow-sm border border-card-border">
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-card-border">
           <h3 className="font-bold text-lg mb-4">扫码付款</h3>
 
           {/* Tab Toggle */}
@@ -164,7 +167,7 @@ export default function Checkout() {
               className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                 payMethod === "wechat"
                   ? "bg-[#07C160] text-white"
-                  : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
               }`}
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg">
@@ -178,7 +181,7 @@ export default function Checkout() {
               className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                 payMethod === "alipay"
                   ? "bg-[#1677FF] text-white"
-                  : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
               }`}
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg">
@@ -198,7 +201,7 @@ export default function Checkout() {
               transition={{ duration: 0.15 }}
               className="flex flex-col items-center"
             >
-              <div className="rounded-2xl overflow-hidden border-4 border-white shadow-lg">
+              <div className="rounded-2xl overflow-hidden border-4 border-white/20 shadow-lg">
                 <img
                   src={payMethod === "wechat" ? "/wechat-qr.png" : "/alipay-qr.jpg"}
                   alt={payMethod === "wechat" ? "微信收款码" : "支付宝收款码"}
@@ -219,11 +222,11 @@ export default function Checkout() {
         </div>
 
         {/* Submit Button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border max-w-[430px] mx-auto z-40">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t border-border max-w-[430px] mx-auto z-40">
           <button
             type="submit"
             disabled={isSubmitting || !formData.name || !formData.phone || !formData.address}
-            className="w-full bg-primary text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
+            className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/30 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">

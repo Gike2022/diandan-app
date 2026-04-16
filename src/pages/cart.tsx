@@ -2,22 +2,24 @@ import { Link } from "wouter";
 import { useCart } from "../context/CartContext";
 import { MobileLayout } from "../components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Heart } from "lucide-react";
 
 export default function Cart() {
-  const { cart, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
+  const { cart, updateQuantity, totalPrice, totalItems } = useCart();
 
   if (cart.length === 0) {
     return (
       <MobileLayout title="购物车" showBack>
         <div className="flex flex-col items-center justify-center h-[60vh] text-center px-6">
-          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+          <div className="w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6">
             <ShoppingBag className="w-10 h-10 text-muted-foreground/50" />
           </div>
           <h2 className="text-xl font-bold mb-2">购物车是空的</h2>
-          <p className="text-muted-foreground mb-8">点些好吃的犒劳一下自己吧</p>
+          <p className="text-muted-foreground mb-8 flex items-center gap-1">
+            点些好吃的 <Heart className="w-4 h-4 text-primary fill-primary" /> 犒劳一下自己吧
+          </p>
           <Link href="/">
-            <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/20">
+            <button className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/30">
               去浏览菜单
             </button>
           </Link>
@@ -29,9 +31,9 @@ export default function Cart() {
   return (
     <MobileLayout title="购物车" showBack>
       <div className="p-4 space-y-4">
-        <div className="bg-card rounded-2xl p-4 shadow-sm border border-card-border">
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-card-border">
           <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-            <span className="w-1 h-4 bg-primary rounded-full block"></span>
+            <span className="w-1 h-4 bg-gradient-to-b from-primary to-accent rounded-full block"></span>
             已选菜品 ({totalItems})
           </h3>
           
@@ -66,7 +68,7 @@ export default function Cart() {
                     <span className="w-4 text-center font-bold text-sm">{item.quantity}</span>
                     <button 
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+                      className="w-7 h-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
@@ -77,7 +79,7 @@ export default function Cart() {
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl p-4 shadow-sm border border-card-border space-y-3">
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-card-border space-y-3">
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>商品总价</span>
             <span>¥{totalPrice.toFixed(2)}</span>
@@ -93,9 +95,9 @@ export default function Cart() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border max-w-[430px] mx-auto z-40">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t border-border max-w-[430px] mx-auto z-40">
         <Link href="/checkout">
-          <button className="w-full bg-primary text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2">
+          <button className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/30 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2">
             去结算
           </button>
         </Link>
