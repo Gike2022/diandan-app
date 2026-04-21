@@ -1,3 +1,17 @@
+// ============================================
+// 菜品数据类型定义
+// ============================================
+
+/**
+ * 菜品数据结构
+ * @property {string} id - 菜品唯一标识符
+ * @property {string} name - 菜品名称
+ * @property {string} category - 所属分类
+ * @property {string} description - 菜品描述
+ * @property {number} price - 价格（单位：元）
+ * @property {string} imageUrl - 菜品图片URL
+ * @property {boolean} soldOut - 是否售罄（可选）
+ */
 export type Dish = {
   id: string;
   name: string;
@@ -8,16 +22,32 @@ export type Dish = {
   soldOut?: boolean;
 };
 
+// ============================================
+// 菜单分类配置
+// ============================================
+
+/**
+ * 菜单分类列表
+ * 用于左侧导航栏和菜品分组显示
+ */
 export const MENU_CATEGORIES = [
   "甜蜜主菜",
   "清爽凉菜",
   "暖心主食",
   "甜蜜饮品",
   "小食甜点"
-];
+] as const;
 
+// ============================================
+// 菜品数据
+// ============================================
+
+/**
+ * 完整菜单数据
+ * 按分类组织所有可供点餐的菜品
+ */
 export const MENU_DATA: Dish[] = [
-  // 甜蜜主菜
+  // ==================== 甜蜜主菜 ====================
   {
     id: "h1",
     name: "爱心红烧肉",
@@ -51,7 +81,8 @@ export const MENU_DATA: Dish[] = [
     imageUrl: "https://picsum.photos/seed/yuxiangrousi/400/300",
     soldOut: true
   },
-  // 清爽凉菜
+  
+  // ==================== 清爽凉菜 ====================
   {
     id: "c1",
     name: "刀拍黄瓜",
@@ -76,7 +107,8 @@ export const MENU_DATA: Dish[] = [
     price: 48,
     imageUrl: "https://picsum.photos/seed/koushuiji/400/300"
   },
-  // 暖心主食
+  
+  // ==================== 暖心主食 ====================
   {
     id: "s1",
     name: "扬州炒饭",
@@ -101,7 +133,8 @@ export const MENU_DATA: Dish[] = [
     price: 15,
     imageUrl: "https://picsum.photos/seed/yangchunmian/400/300"
   },
-  // 甜蜜饮品
+  
+  // ==================== 甜蜜饮品 ====================
   {
     id: "d1",
     name: "冰镇酸梅汤",
@@ -126,7 +159,8 @@ export const MENU_DATA: Dish[] = [
     price: 10,
     imageUrl: "https://picsum.photos/seed/juhuacha/400/300"
   },
-  // 小食甜点
+  
+  // ==================== 小食甜点 ====================
   {
     id: "k1",
     name: "特色生煎包",
