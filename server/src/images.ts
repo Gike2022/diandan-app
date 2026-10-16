@@ -3,12 +3,13 @@ import { mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { ApiError } from './errors.js';
+import type { Pool } from 'mysql2/promise';
 
 export const uploadedImageUrl = /^\/api\/uploads\/menu\/[a-f0-9]{64}\.webp$/;
 export const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 export const maxImageBytes = 5 * 1024 * 1024;
 
-export async function saveMenuImage(directory: string, input: unknown) {
+export async function saveMenuImage(directory: string, input: unknown, pool?: Pool) {
   if (!Buffer.isBuffer(input) || !input.length) throw new ApiError(400, 'IMAGE_REQUIRED', '请选择需要上传的图片');
   if (input.length > maxImageBytes) throw new ApiError(413, 'IMAGE_TOO_LARGE', '图片不能超过 5 MB');
   let output: Buffer;
@@ -22,7 +23,13 @@ export async function saveMenuImage(directory: string, input: unknown) {
     if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '') || (metadata.pages ?? 1) > 1) throw new Error('Unsupported image');
     output = await image.rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
   } catch { throw new ApiError(400, 'INVALID_IMAGE', '图片内容无效，请选择有效的 JPG、PNG 或静态 WebP 图片（最多 2500 万像素）'); }
-  const name = `${createHash('sha256').update(output).digest('hex')}.webp`;
+  if (output.length > maxImageBytes) throw new ApiError(413, 'IMAGE_TOO_LARGE', '处理后的图片超过 5 MB，请选择较小图片');
+  const hash = createHash('sha256').update(output).digest('hex');
+  const name = `${hash}.webp`;
+  if (pool) {
+    await pool.execute('INSERT INTO menu_images (hash, content) VALUES (?, ?) ON DUPLICATE KEY UPDATE hash = menu_images.hash', [hash, output]);
+    return { imageUrl: `/api/uploads/menu/${name}`, size: output.length };
+  }
   await mkdir(directory, { recursive: true });
   const temporary = join(directory, `.${randomUUID()}.tmp`);
   try {

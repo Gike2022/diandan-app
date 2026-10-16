@@ -52,6 +52,7 @@ npm run dev
 - [商家页面使用和流程演示](docs/merchant-guide.md)
 - [营业统计、图片上传与个人资料操作](docs/statistics-images-account-guide.md)
 - [网站演示登录账号](登录账号说明.md)
+- [免费云端部署：Render 网站与 Aiven MySQL](docs/cloud-deployment.md)
 - [已实现接口、请求格式与业务规则](docs/backend-api.md)
 - [可在 REST Client 中运行的请求示例](server/requests.http)
 - [数据库 SQL 迁移](server/migrations/001_initial.sql)

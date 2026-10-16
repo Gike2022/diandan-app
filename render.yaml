@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: diandan-app-gike2022
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci --include=dev && npm --prefix server ci --include=dev && npm run build && npm run build:api
+    startCommand: npm --prefix server run start:cloud
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_MODE
+        value: demo
+      - key: HOST
+        value: 0.0.0.0
+      - key: SERVE_FRONTEND
+        value: "true"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: IMAGE_STORAGE
+        value: mysql
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_CA
+        sync: false
+      - key: ENABLE_DEMO_PAYMENTS
+        value: "true"
+      - key: DEMO_ADMIN_PASSWORD
+        generateValue: true
+      - key: DEMO_CUSTOMER_PASSWORD
+        value: Customer12345!
+      - key: VITE_API_BASE_URL
+        value: /api

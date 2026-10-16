@@ -10,10 +10,14 @@ import * as orders from './orders.js';
 import { resourceId, uuid } from './validation.js';
 import { businessStatistics, defaultStatisticsRange, statisticsQuery } from './statistics.js';
 import { imageTypes, saveMenuImage } from './images.js';
+import { rows } from './db.js';
+import { existsSync } from 'node:fs';
+import { extname, join } from 'node:path';
 
 export function createApp(pool: Pool, config: AppConfig, options: { authRateLimit?: number } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  if (config.trustProxyHops) app.set('trust proxy', config.trustProxyHops);
   app.use(cors({ origin(origin, callback) {
     if (!origin || config.corsOrigins.includes(origin)) callback(null, true);
     else callback(new ApiError(403, 'ORIGIN_NOT_ALLOWED', '该页面来源未获允许'));
@@ -88,10 +92,16 @@ export function createApp(pool: Pool, config: AppConfig, options: { authRateLimi
   app.post('/api/admin/uploads/images', uploadLimiter, (req, _res, next) => {
     if (!imageTypes.includes(req.get('Content-Type')?.split(';')[0]?.toLowerCase() ?? '')) throw new ApiError(415, 'IMAGE_TYPE_UNSUPPORTED', '仅支持 JPG、PNG 和 WebP 图片');
     next();
-  }, express.raw({ type: () => true, limit: '5mb', inflate: false }), async (req, res) => { res.status(201).json(await saveMenuImage(config.uploadDirectory, req.body)); });
-  app.get('/api/uploads/menu/:filename', (req, res, next) => {
+  }, express.raw({ type: () => true, limit: '5mb', inflate: false }), async (req, res) => { res.status(201).json(await saveMenuImage(config.uploadDirectory, req.body, config.imageStorage === 'mysql' ? pool : undefined)); });
+  app.get('/api/uploads/menu/:filename', async (req, res, next) => {
     const filename = String(req.params.filename);
     if (!/^[a-f0-9]{64}\.webp$/.test(filename)) throw new ApiError(404, 'IMAGE_NOT_FOUND', '图片不存在');
+    if (config.imageStorage === 'mysql') {
+      const [image] = await rows(pool, 'SELECT content FROM menu_images WHERE hash = ?', [filename.slice(0, 64)]);
+      if (!image) throw new ApiError(404, 'IMAGE_NOT_FOUND', '图片不存在');
+      res.set('Cache-Control', 'public, max-age=31536000, immutable').type('webp').send(image.content as Buffer);
+      return;
+    }
     res.sendFile(filename, { root: config.uploadDirectory, dotfiles: 'deny', maxAge: '1y', immutable: true }, error => {
       if (error) next('statusCode' in error && error.statusCode === 404 || 'code' in error && error.code === 'ENOENT' ? new ApiError(404, 'IMAGE_NOT_FOUND', '图片不存在') : error);
     });
@@ -123,7 +133,17 @@ export function createApp(pool: Pool, config: AppConfig, options: { authRateLimi
     res.json({ order: await orders.transitionOrder(pool, uuid.parse(req.params.id), res.locals.user as User, orders.transitionInput.parse(req.body)) });
   });
 
-  app.use((_req, _res, next) => { next(new ApiError(404, 'NOT_FOUND', '接口不存在')); });
+  app.use('/api', (_req, _res, next) => { next(new ApiError(404, 'NOT_FOUND', '接口不存在')); });
+  if (config.frontendDirectory) {
+    const indexFile = join(config.frontendDirectory, 'index.html');
+    if (!existsSync(indexFile)) throw new Error('未找到前端构建产物，请先运行 npm run build');
+    app.use(express.static(config.frontendDirectory, { index: false, dotfiles: 'deny', redirect: false }));
+    app.use((req, res, next) => {
+      if (!['GET', 'HEAD'].includes(req.method) || !req.accepts('html') || extname(req.path) || req.path.startsWith('/assets/') || req.path.split('/').some(part => part.startsWith('.'))) { next(); return; }
+      res.sendFile(indexFile);
+    });
+  }
+  app.use((_req, _res, next) => { next(new ApiError(404, 'NOT_FOUND', '资源不存在')); });
   app.use(errorHandler);
   return app;
 }

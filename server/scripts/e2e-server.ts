@@ -18,7 +18,7 @@ if (!/_test(?:_[a-f0-9]+)?$/.test(database) || database === connectionOptions(co
 const pool = createPool(testUrl);
 const uploadDirectory = await mkdtemp(join(tmpdir(), 'sweet-kitchen-e2e-images-'));
 await migrate(pool);
-for (const table of ['catalog_create_requests', 'payments', 'order_items', 'orders', 'sessions', 'users', 'dishes', 'categories']) {
+for (const table of ['catalog_create_requests', 'payments', 'order_items', 'orders', 'sessions', 'users', 'dishes', 'categories', 'menu_images']) {
   await pool.query(`DELETE FROM ${table}`);
 }
 await seed(pool, 'Admin12345!', 'Customer12345!');

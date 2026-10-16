@@ -70,9 +70,11 @@ npm run db:stop
 
 `migrations/001_initial.sql` 建立 7 张业务表：users、sessions、categories、dishes、orders、order_items、payments；迁移脚本另建 schema_migrations 表，共 8 张表。
 
-`migrations/002_catalog_consistency.sql` 为菜品和分类增加版本，并增加管理新增请求去重表 `catalog_create_requests`，当前共 9 张表（含迁移表）。更新环境先运行 `npm run db:migrate`，再构建并重启 API；不要改写已执行的 001 文件。连接池在新建每条连接时设置会话 UTC，避免本机 MySQL 默认北京时间导致 `updated_at` 超前 8 小时，不更改系统服务或全局时区。
+`migrations/002_catalog_consistency.sql` 为菜品和分类增加版本，并增加管理新增请求去重表 `catalog_create_requests`，此时共 9 张表（含迁移表）。更新环境先运行 `npm run db:migrate`，再构建并重启 API；不要改写已执行的 001 文件。连接池在新建每条连接时设置会话 UTC，避免本机 MySQL 默认北京时间导致 `updated_at` 超前 8 小时，不更改系统服务或全局时区。
 
 `migrations/003_order_payment_expiry.sql` 增加每笔订单的付款截止时间及扫描索引，已有订单按创建时间加 15 分钟回填，保留原更新时间。升级时先停止 API，再迁移、构建和重新启动，避免旧进程仍按旧表结构下单。
+
+`migrations/004_menu_image_storage.sql` 新增 `menu_images` 保存云端图片，当前共 10 张表（含迁移表）。`IMAGE_STORAGE=mysql` 时使用此表，`filesystem` 为原有默认模式。新迁移不会搬移或删除本机图片。
 
 ## 未付款自动取消
 
@@ -105,13 +107,19 @@ npm run start:api
 
 菜品图片由 sharp 解码转为 WebP，上传仅允许管理员；默认保存在项目 `.local/uploads/menu`，不随构建清理。`UPLOAD_DIRECTORY` 可指定其他持久目录，相对路径以启动 API 的 `server/` 工作目录为基准。备份数据库时也需备份图片目录，历史订单依赖原文件。图片通过 `/api/uploads/menu/<摘要>.webp` 匿名读取，不能列举目录。上传大小上限 5 MiB，支持 JPG/PNG/静态 WebP，像素数最多 2500 万，最长边处理到 1600px。
 
-本次统计、图片和账户功能复用已有数据库字段，无需新增 SQL 迁移。`npm run install:api` 会安装图片处理依赖。修改个人资料接口只允许昵称、电话；改密验证原密码并事务撤销旧会话，返回新会话，登录也使用用户行锁避免旧密码竞争。统计口径、上传格式、限流和测试说明见 [接口文档](../docs/backend-api.md) 与 [操作说明](../docs/statistics-images-account-guide.md)。
+免费云端主机使用 `IMAGE_STORAGE=mysql`，图片随数据库持久保存；先执行 004 迁移。`npm run install:api` 会安装图片处理依赖。修改个人资料接口只允许昵称、电话；改密验证原密码并事务撤销旧会话，返回新会话，登录也使用用户行锁避免旧密码竞争。统计口径、上传格式、限流和测试说明见 [接口文档](../docs/backend-api.md) 与 [操作说明](../docs/statistics-images-account-guide.md)。
+
+## 免费云端演示
+
+[部署说明](../docs/cloud-deployment.md) 提供 Render Free Web Service + Aiven MySQL Free 配置。`SERVE_FRONTEND=true` 由 Express 同时托管构建后的 React；`DATABASE_SSL=true` 验证云数据库证书与主机名，`DATABASE_SSL_CA` 填服务商 CA 的 PEM 内容（也接受转义的 `\n`）。`TRUST_PROXY_HOPS=1` 适用于 Render 的入口代理，本机保持 0。不要将实际连接串提交到仓库。
+
+云端 `npm run start:cloud` 先运行幂等迁移和 seed，再启动 API。需要安装开发依赖以运行 tsx；Render 构建命令已显式指定 `--include=dev`。管理员初始密码由部署环境单独生成，重复 seed 保留已修改的账户和菜单。
 
 ## 支付与权限规则
 
 - 认证使用 `Authorization: Bearer <token>`。令牌有效期 7 天，数据库只保存摘要；退出后立即失效。
 - 用户注册不能指定角色。管理员由初始化脚本创建。
 - 模拟支付需要 `ENABLE_DEMO_PAYMENTS=true`，返回 `mode: demo`。所有模拟付款和退款保存在 payments 表。
-- `NODE_ENV=production` 时禁止启用模拟支付；此阶段尚未接入真实支付渠道。
+- `NODE_ENV=production` 正常模式禁止模拟支付。公开课程演示必须同时设置 `APP_MODE=demo` 和 `ENABLE_DEMO_PAYMENTS=true`，明确允许演示支付；此阶段尚未接入真实支付渠道。
 - 金额用整数分存储；每份包装费固定 50 分，后端根据数据库菜品价格计价。
 - 接口规则与完整清单见 [接口文档](../docs/backend-api.md)。

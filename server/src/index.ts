@@ -4,7 +4,7 @@ import { createPool } from './db.js';
 import { startOrderExpiryWorker } from './order-expiry-worker.js';
 
 const config = loadConfig();
-const pool = createPool(config.databaseUrl);
+const pool = createPool(config.databaseUrl, config.databaseSsl);
 try {
   await pool.query('SELECT 1');
   const stopExpiryWorker = startOrderExpiryWorker(pool, config.expirySweepIntervalMs);

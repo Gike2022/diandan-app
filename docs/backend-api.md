@@ -92,9 +92,9 @@
 
 `POST /admin/uploads/images` 需管理员 Bearer token，`Content-Type` 为 `image/jpeg`、`image/png` 或 `image/webp`，请求体直接为文件二进制，最多 5 MiB；不是 multipart 或 JSON。每 IP 每 15 分钟最多 30 次上传。
 
-后端检查文件签名、真实解码格式和像素数，拒绝 SVG、损坏图片、动画和超过 2500 万像素的输入，转换为最长边不超过 1600px 的 WebP。成功返回 201 `{imageUrl: "/api/uploads/menu/<64位摘要>.webp", size}`，重复相同内容可复用路径。文件名由服务端生成，原子写入配置的上传目录。
+后端检查文件签名、真实解码格式和像素数，拒绝 SVG、损坏图片、动画和超过 2500 万像素的输入，转换为最长边不超过 1600px 的 WebP，处理后仍限制 5 MiB。成功返回 201 `{imageUrl: "/api/uploads/menu/<64位摘要>.webp", size}`，重复相同内容可复用路径。`IMAGE_STORAGE=filesystem` 原子写入配置目录；`mysql` 按摘要去重写入 `menu_images`，两种模式使用相同接口。
 
-`GET /uploads/menu/<64位摘要>.webp` 可匿名读取，返回 `image/webp`，无效或不存在的文件名返回 404。菜品 `imageUrl` 现在也接受此规范相对地址；任意其他本地相对路径不接受。上传只创建文件，需再保存菜品绑定图片；替换图片不删除旧文件，以便历史订单继续使用原图。部署和备份见 [操作说明](statistics-images-account-guide.md)。图片处理选项参考 [sharp 构造参数](https://sharp.pixelplumbing.com/api-constructor/) 和 [输出说明](https://sharp.pixelplumbing.com/api-output/)。
+`GET /uploads/menu/<64位摘要>.webp` 可匿名读取，返回 `image/webp`，无效或不存在的文件名返回 404。菜品 `imageUrl` 现在也接受此规范相对地址；任意其他本地相对路径不接受。上传只保存图片，需再保存菜品绑定图片；替换图片不删除旧内容，以便历史订单继续使用原图。部署和备份见 [操作说明](statistics-images-account-guide.md)。图片处理选项参考 [sharp 构造参数](https://sharp.pixelplumbing.com/api-constructor/) 和 [输出说明](https://sharp.pixelplumbing.com/api-output/)。
 
 ## 分类与菜品
 

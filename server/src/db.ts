@@ -1,14 +1,19 @@
 import { createPool as createCorePool } from 'mysql2';
+import type { SslOptions } from 'mysql2';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 
 export type Database = Pool | PoolConnection;
 export type SqlValue = string | number | boolean | Date | null;
 
-export function connectionOptions(databaseUrl: string) {
+export function connectionOptions(databaseUrl: string, ssl?: SslOptions) {
   const url = new URL(databaseUrl);
   const database = decodeURIComponent(url.pathname.slice(1));
   if (url.protocol !== 'mysql:' || !/^[a-zA-Z0-9_]+$/.test(database)) {
     throw new Error('DATABASE_URL 必须包含有效的 MySQL 数据库名（字母、数字、下划线）');
+  }
+  const requiredTls = url.searchParams.get('ssl-mode') ?? url.searchParams.get('sslmode');
+  if (requiredTls && ['REQUIRED', 'VERIFY_CA', 'VERIFY_IDENTITY', 'REQUIRE'].includes(requiredTls.toUpperCase()) && !ssl) {
+    throw new Error('云数据库连接要求 TLS，请配置 DATABASE_SSL=true 和服务商 CA 证书');
   }
   return {
     host: url.hostname,
@@ -21,11 +26,12 @@ export function connectionOptions(databaseUrl: string) {
     supportBigNumbers: true,
     bigNumberStrings: true,
     connectTimeout: 5000,
+    ...(ssl ? { ssl } : {}),
   };
 }
 
-export function createPool(databaseUrl: string): Pool {
-  const pool = createCorePool({ ...connectionOptions(databaseUrl), connectionLimit: 10 });
+export function createPool(databaseUrl: string, ssl?: SslOptions): Pool {
+  const pool = createCorePool({ ...connectionOptions(databaseUrl, ssl), connectionLimit: 10 });
   // The driver timezone controls serialization; the SQL session separately controls CURRENT_TIMESTAMP.
   pool.on('connection', connection => {
     connection.query("SET SESSION time_zone = '+00:00'", error => { if (error) connection.destroy(); });

@@ -12,7 +12,7 @@ import { seed } from '../scripts/seed-data.js';
 import { expireUnpaidOrders, simulatePayment } from '../src/orders.js';
 import { startOrderExpiryWorker } from '../src/order-expiry-worker.js';
 import type { User } from '../src/auth.js';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import sharp from 'sharp';
@@ -60,7 +60,7 @@ describe('真实 MySQL 点餐 API', { concurrency: false }, () => {
     pool = createPool(testUrl);
     uploadDirectory = await mkdtemp(join(tmpdir(), 'sweet-kitchen-api-images-'));
     await migrate(pool);
-    for (const table of ['catalog_create_requests', 'payments', 'order_items', 'orders', 'sessions', 'users', 'dishes', 'categories']) {
+    for (const table of ['catalog_create_requests', 'payments', 'order_items', 'orders', 'sessions', 'users', 'dishes', 'categories', 'menu_images']) {
       await pool.query(`DELETE FROM ${table}`);
     }
     await seed(pool, 'Admin12345!', 'Customer12345!');
@@ -95,6 +95,87 @@ describe('真实 MySQL 点餐 API', { concurrency: false }, () => {
     assert.equal(result.status, 200);
     assert.deepEqual(result.body, { status: 'ok', database: 'mysql', paymentMode: 'demo' });
     assert.equal(result.headers.get('x-powered-by'), null);
+  });
+
+  it('云端统一入口支持页面直达，保留 API 错误并拒绝泄露隐藏文件', async () => {
+    const frontendDirectory = join(uploadDirectory, 'frontend');
+    await mkdir(join(frontendDirectory, 'assets'), { recursive: true });
+    const html = '<!doctype html><html><body>cloud-frontend</body></html>';
+    await writeFile(join(frontendDirectory, 'index.html'), html);
+    await writeFile(join(frontendDirectory, 'assets', 'app.js'), 'console.log("cloud")');
+    await writeFile(join(frontendDirectory, '.env'), 'PRIVATE_VALUE=must-never-be-served');
+    const combined = createApp(pool, { ...config, frontendDirectory, trustProxyHops: 1, corsOrigins: ['https://ordering.example'] }).listen(0, '127.0.0.1');
+    await once(combined, 'listening');
+    const address = combined.address();
+    assert.ok(address && typeof address !== 'string');
+    const origin = `http://127.0.0.1:${address.port}`;
+    try {
+      for (const path of ['/', '/login', '/register', '/profile', '/admin', '/orders/example']) {
+        const response = await fetch(origin + path, { headers: { Accept: 'text/html' } });
+        assert.equal(response.status, 200, path);
+        assert.match(response.headers.get('content-type')!, /text\/html/);
+        assert.equal(await response.text(), html);
+      }
+      assert.equal((await fetch(origin + '/assets/app.js')).status, 200);
+      for (const path of ['/api/not-found', '/assets/missing.js', '/.env', '/missing.css']) {
+        const response = await fetch(origin + path, { headers: { Accept: 'text/html' } });
+        assert.equal(response.status, 404, path);
+        assert.match(response.headers.get('content-type')!, /application\/json/);
+        assert.ok(!(await response.text()).includes('must-never-be-served'));
+      }
+      const ownOrigin = await fetch(origin + '/api/menu', { headers: { Origin: 'https://ordering.example' } });
+      assert.equal(ownOrigin.status, 200);
+      assert.equal(ownOrigin.headers.get('access-control-allow-origin'), 'https://ordering.example');
+      assert.equal((await fetch(origin + '/admin', { method: 'POST' })).status, 404);
+      assert.equal((await fetch(origin + '/profile', { method: 'HEAD' })).status, 200);
+    } finally {
+      await new Promise<void>(resolve => combined.close(() => resolve()));
+    }
+  });
+
+  it('云端图片写入 MySQL 并去重，新实例无需本地文件仍能读取原图片', async () => {
+    const unusedDirectory = join(uploadDirectory, 'no-local-image-files');
+    const png = await sharp({ create: { width: 128, height: 64, channels: 3, background: '#a454cc' } }).png().toBuffer();
+    const imageConfig = { ...config, uploadDirectory: unusedDirectory, imageStorage: 'mysql' as const };
+    const uploader = createApp(pool, imageConfig).listen(0, '127.0.0.1');
+    await once(uploader, 'listening');
+    const address = uploader.address();
+    assert.ok(address && typeof address !== 'string');
+    let imageUrl = '';
+    let expected: Buffer;
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const uploaded = await fetch(`http://127.0.0.1:${address.port}/api/admin/uploads/images`, { method: 'POST', headers: { Authorization: `Bearer ${admin}`, 'Content-Type': 'image/png' }, body: png });
+        assert.equal(uploaded.status, 201);
+        const body = await uploaded.json() as Json;
+        if (imageUrl) assert.equal(body.imageUrl, imageUrl);
+        imageUrl = body.imageUrl;
+      }
+      const stored = await rows(pool, 'SELECT content FROM menu_images WHERE hash = ?', [imageUrl.split('/').at(-1)!.slice(0, 64)]);
+      assert.equal(stored.length, 1);
+      expected = stored[0]!.content as Buffer;
+      await assert.rejects(access(unusedDirectory), { code: 'ENOENT' });
+    } finally {
+      await new Promise<void>(resolve => uploader.close(() => resolve()));
+    }
+    const restartedPool = createPool(testUrl);
+    const reader = createApp(restartedPool, imageConfig).listen(0, '127.0.0.1');
+    await once(reader, 'listening');
+    const restartedAddress = reader.address();
+    assert.ok(restartedAddress && typeof restartedAddress !== 'string');
+    const restartedBase = `http://127.0.0.1:${restartedAddress.port}`;
+    try {
+      const response = await fetch(restartedBase + imageUrl);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-type'), 'image/webp');
+      assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), expected!);
+      assert.equal((await fetch(restartedBase + '/api/uploads/menu/' + '0'.repeat(64) + '.webp')).status, 404);
+      assert.equal((await fetch(restartedBase + '/api/uploads/menu/.env')).status, 404);
+    } finally {
+      await new Promise<void>(resolve => reader.close(() => resolve()));
+      await restartedPool.end();
+    }
   });
 
   it('SQL 迁移与初始化可重复执行，保留已修改的数据和密码', async () => {
