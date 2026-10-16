@@ -1,0 +1,26 @@
+{
+  "categories": [
+    { "id": "main", "name": "甜蜜主菜" },
+    { "id": "cold", "name": "清爽凉菜" },
+    { "id": "staples", "name": "暖心主食" },
+    { "id": "drinks", "name": "甜蜜饮品" },
+    { "id": "snacks", "name": "小食甜点" }
+  ],
+  "dishes": [
+    { "id": "h1", "categoryId": "main", "name": "爱心红烧肉", "description": "肥而不腻，入口即化，甜蜜滋味", "priceCents": 6800, "imageUrl": "https://picsum.photos/seed/hongshaorou/400/300" },
+    { "id": "h2", "categoryId": "main", "name": "情侣鸡丁", "description": "酸甜微辣，花生酥脆，鸡肉鲜嫩", "priceCents": 4200, "imageUrl": "https://picsum.photos/seed/gongbaojiding/400/300" },
+    { "id": "h3", "categoryId": "main", "name": "麻婆豆腐", "description": "麻辣鲜香，烫爽下饭", "priceCents": 2800, "imageUrl": "https://picsum.photos/seed/mapodoufu/400/300" },
+    { "id": "h4", "categoryId": "main", "name": "鱼香肉丝", "description": "咸甜酸辣，木耳爽脆，百吃不厌", "priceCents": 3800, "imageUrl": "https://picsum.photos/seed/yuxiangrousi/400/300", "soldOut": true },
+    { "id": "c1", "categoryId": "cold", "name": "刀拍黄瓜", "description": "清脆爽口，蒜香浓郁，解腻佳品", "priceCents": 1800, "imageUrl": "https://picsum.photos/seed/daopaihuanggua/400/300" },
+    { "id": "c2", "categoryId": "cold", "name": "夫妻肺片", "description": "麻辣红油，肉质劲道，风味独特", "priceCents": 5600, "imageUrl": "https://picsum.photos/seed/fuqifeipian/400/300" },
+    { "id": "c3", "categoryId": "cold", "name": "川味口水鸡", "description": "麻辣鲜香嫩爽，红油色泽诱人", "priceCents": 4800, "imageUrl": "https://picsum.photos/seed/koushuiji/400/300" },
+    { "id": "s1", "categoryId": "staples", "name": "扬州炒饭", "description": "粒粒分明，配料丰富，香气四溢", "priceCents": 2800, "imageUrl": "https://picsum.photos/seed/yangzhouchaofan/400/300" },
+    { "id": "s2", "categoryId": "staples", "name": "老北京炸酱面", "description": "手工面条，秘制肉酱，菜码丰富", "priceCents": 2600, "imageUrl": "https://picsum.photos/seed/zhajiangmian/400/300" },
+    { "id": "s3", "categoryId": "staples", "name": "阳春面", "description": "清汤挂面，葱香扑鼻，暖胃舒心", "priceCents": 1500, "imageUrl": "https://picsum.photos/seed/yangchunmian/400/300" },
+    { "id": "d1", "categoryId": "drinks", "name": "冰镇酸梅汤", "description": "古法熬制，生津止渴，解辣神器", "priceCents": 1200, "imageUrl": "https://picsum.photos/seed/suanmeitang/400/300" },
+    { "id": "d2", "categoryId": "drinks", "name": "冰峰汽水", "description": "经典橙味汽水，童年回忆", "priceCents": 600, "imageUrl": "https://picsum.photos/seed/bingfeng/400/300" },
+    { "id": "d3", "categoryId": "drinks", "name": "冰镇菊花茶", "description": "清热降火，微甜回甘", "priceCents": 1000, "imageUrl": "https://picsum.photos/seed/juhuacha/400/300" },
+    { "id": "k1", "categoryId": "snacks", "name": "特色生煎包", "description": "底酥皮薄，汤汁丰盈，肉馅鲜美", "priceCents": 2200, "imageUrl": "https://picsum.photos/seed/shengjianbao/400/300" },
+    { "id": "k2", "categoryId": "snacks", "name": "香酥春卷", "description": "外皮金黄酥脆，内馅鲜香爽口", "priceCents": 1800, "imageUrl": "https://picsum.photos/seed/chunjuan/400/300" }
+  ]
+}

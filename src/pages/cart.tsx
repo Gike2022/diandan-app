@@ -3,6 +3,7 @@ import { useCart } from "../context/CartContext";
 import { MobileLayout } from "../components/layout";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, ShoppingBag, Heart } from "lucide-react";
+import { imageSource } from "../lib/api";
 
 export default function Cart() {
   const { cart, updateQuantity, totalPrice, totalItems } = useCart();
@@ -18,10 +19,8 @@ export default function Cart() {
           <p className="text-muted-foreground mb-8 flex items-center gap-1">
             点些好吃的 <Heart className="w-4 h-4 text-primary fill-primary" /> 犒劳一下自己吧
           </p>
-          <Link href="/">
-            <button className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/30">
+          <Link href="/" className="bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-3 rounded-full font-medium active:scale-95 transition-transform shadow-lg shadow-primary/30">
               去浏览菜单
-            </button>
           </Link>
         </div>
       </MobileLayout>
@@ -49,7 +48,7 @@ export default function Cart() {
                   className="flex gap-4 items-center"
                 >
                   <img 
-                    src={item.imageUrl} 
+                    src={imageSource(item.imageUrl)}
                     alt={item.name} 
                     className="w-16 h-16 rounded-lg object-cover bg-muted shrink-0" 
                   />
@@ -61,6 +60,7 @@ export default function Cart() {
                   <div className="flex items-center gap-3 shrink-0">
                     <button 
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      aria-label={`减少${item.name}`}
                       className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-foreground active:scale-95 transition-transform"
                     >
                       <Minus className="w-3 h-3" />
@@ -68,6 +68,8 @@ export default function Cart() {
                     <span className="w-4 text-center font-bold text-sm">{item.quantity}</span>
                     <button 
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      aria-label={`增加${item.name}`}
+                      disabled={item.quantity >= 99}
                       className="w-7 h-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
                     >
                       <Plus className="w-3 h-3" />
@@ -96,10 +98,8 @@ export default function Cart() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t border-border max-w-[430px] mx-auto z-40">
-        <Link href="/checkout">
-          <button className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/30 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2">
+        <Link href="/checkout" className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full py-3.5 font-bold shadow-xl shadow-primary/30 active:scale-[0.98] transition-transform text-lg flex items-center justify-center gap-2">
             去结算
-          </button>
         </Link>
       </div>
     </MobileLayout>

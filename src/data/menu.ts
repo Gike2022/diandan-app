@@ -18,6 +18,7 @@ export type Dish = {
   category: string;
   description: string;
   price: number;
+  priceCents?: number;
   imageUrl: string;
   soldOut?: boolean;
 };

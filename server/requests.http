@@ -1,0 +1,81 @@
+@baseUrl = http://127.0.0.1:3001/api
+
+### 登录后可查看自己的资料
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{customerLogin.response.body.token}}
+
+### 商家营业统计（日期按北京时间下单时间筛选）
+GET {{baseUrl}}/admin/statistics?dateFrom=2026-10-10&dateTo=2026-10-16
+Authorization: Bearer {{adminLogin.response.body.token}}
+
+### 健康检查
+GET {{baseUrl}}/health
+
+### 顾客登录（使用 .env 中设置的演示密码）
+# @name customerLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "username": "demo", "password": "Customer12345!" }
+
+### 菜单
+GET {{baseUrl}}/menu?pageSize=100
+
+### 下单；新订单请更换 Idempotency-Key，重试保留同一个键
+# @name createOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{customerLogin.response.body.token}}
+Idempotency-Key: course-demo-order-001
+Content-Type: application/json
+
+{
+  "items": [{ "dishId": "h1", "quantity": 2 }, { "dishId": "d2", "quantity": 1 }],
+  "name": "演示同学",
+  "phone": "13800000000",
+  "address": "课程演示地址",
+  "notes": "少辣",
+  "payMethod": "wechat"
+}
+
+### 模拟支付
+POST {{baseUrl}}/orders/{{createOrder.response.body.order.id}}/demo-payment
+Authorization: Bearer {{customerLogin.response.body.token}}
+Content-Type: application/json
+
+{ "outcome": "success" }
+
+### 顾客查看历史订单
+GET {{baseUrl}}/orders
+Authorization: Bearer {{customerLogin.response.body.token}}
+
+### 商家登录
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "Admin12345!" }
+
+### 商家接单并开始制作
+PATCH {{baseUrl}}/admin/orders/{{createOrder.response.body.order.id}}/status
+Authorization: Bearer {{adminLogin.response.body.token}}
+Content-Type: application/json
+
+{ "status": "preparing" }
+
+### 商家开始配送
+PATCH {{baseUrl}}/admin/orders/{{createOrder.response.body.order.id}}/status
+Authorization: Bearer {{adminLogin.response.body.token}}
+Content-Type: application/json
+
+{ "status": "delivering" }
+
+### 商家完成订单
+PATCH {{baseUrl}}/admin/orders/{{createOrder.response.body.order.id}}/status
+Authorization: Bearer {{adminLogin.response.body.token}}
+Content-Type: application/json
+
+{ "status": "completed" }
+
+### 商家查看模拟订单汇总
+GET {{baseUrl}}/admin/orders/summary
+Authorization: Bearer {{adminLogin.response.body.token}}

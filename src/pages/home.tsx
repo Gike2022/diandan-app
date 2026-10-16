@@ -1,8 +1,11 @@
 // ============================================
 // 导入依赖
 // ============================================
-import { useState, useRef, useEffect } from "react";
-import { MENU_DATA, MENU_CATEGORIES } from "../data/menu";
+import { useState, useRef, useEffect, useMemo } from "react";
+import type { Dish } from "../data/menu";
+import { useMenu } from "../hooks/use-menu";
+import { RequestState } from "../components/request-state";
+import { errorMessage, imageSource } from "../lib/api";
 import { useCart } from "../context/CartContext";
 import { MobileLayout } from "../components/layout";
 import { motion, AnimatePresence, useInView } from "framer-motion";
@@ -22,10 +25,16 @@ import { Plus, Minus, Heart, Sparkles, TrendingUp, Star } from "lucide-react";
  * 4. 售罄状态显示
  */
 export default function Home() {
+  const menu = useMenu();
+  const MENU_DATA = menu.data?.dishes ?? [];
+  const MENU_CATEGORIES = useMemo(() => menu.data?.categories.map(category => category.name) ?? [], [menu.data]);
   // ==================== 状态管理 ====================
   
   /** 当前激活的菜单分类 */
-  const [activeCategory, setActiveCategory] = useState<string>(MENU_CATEGORIES[0]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  useEffect(() => {
+    if (!MENU_CATEGORIES.includes(activeCategory)) setActiveCategory(MENU_CATEGORIES[0] ?? "");
+  }, [MENU_CATEGORIES, activeCategory]);
   
   /** 购物车相关方法和数据 */
   const { addToCart, updateQuantity, cart } = useCart();
@@ -83,7 +92,7 @@ export default function Home() {
 
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [MENU_CATEGORIES]);
 
   // ==================== 视差滚动效果 ====================
   
@@ -104,7 +113,7 @@ export default function Home() {
 
     container.addEventListener('scroll', handleParallax);
     return () => container.removeEventListener('scroll', handleParallax);
-  }, []);
+  }, [menu.data]);
 
   // ==================== 分类点击滚动 ====================
   
@@ -139,6 +148,10 @@ export default function Home() {
 
   // ==================== 渲染组件 ====================
   
+  if (menu.isPending) return <MobileLayout title="甜蜜小厨"><RequestState message="正在准备今天的菜单…" /></MobileLayout>;
+  if (menu.isError) return <MobileLayout title="甜蜜小厨"><RequestState error message={errorMessage(menu.error)} retry={() => { void menu.refetch(); }} /></MobileLayout>;
+  if (MENU_DATA.length === 0) return <MobileLayout title="甜蜜小厨"><div className="m-4 p-8 text-center rounded-2xl border border-card-border bg-card/80"><Heart className="w-10 h-10 mx-auto mb-4 text-primary" aria-hidden="true" /><h2 className="font-bold mb-2">菜单正在准备中</h2><p className="text-sm text-muted-foreground">暂时没有可售菜品，稍后再来看看吧</p><button onClick={() => { void menu.refetch(); }} className="min-h-11 mt-4 px-5 border border-primary/40 rounded-full text-primary">刷新菜单</button></div></MobileLayout>;
+
   return (
     <MobileLayout title="甜蜜小厨">
       
@@ -347,10 +360,10 @@ export default function Home() {
 // ============================================
 
 interface DishCardProps {
-  dish: any;
+  dish: Dish;
   qty: number;
   dishIndex: number;
-  addToCart: (dish: any) => void;
+  addToCart: (dish: Dish) => void;
   updateQuantity: (id: string, quantity: number) => void;
 }
 
@@ -382,7 +395,7 @@ function DishCard({ dish, qty, dishIndex, addToCart, updateQuantity }: DishCardP
           transition={{ type: "spring", stiffness: 300 }}
         >
           <img
-            src={dish.imageUrl}
+            src={imageSource(dish.imageUrl)}
             alt={dish.name}
             className="w-full h-full object-cover transition-all duration-700 group-hover:scale-125 group-hover:brightness-110"
             loading="lazy"
@@ -467,6 +480,7 @@ function DishCard({ dish, qty, dishIndex, addToCart, updateQuantity }: DishCardP
                     exit={{ scale: 0, rotate: 180 }}
                     transition={{ type: "spring", stiffness: 300 }}
                     onClick={() => addToCart(dish)}
+                    aria-label={`添加${dish.name}`}
                     whileHover={{ scale: 1.1, rotate: 90 }}
                     whileTap={{ scale: 0.9 }}
                     className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 relative overflow-hidden"
@@ -495,6 +509,7 @@ function DishCard({ dish, qty, dishIndex, addToCart, updateQuantity }: DishCardP
                     {/* 减少按钮 */}
                     <motion.button
                       onClick={() => updateQuantity(dish.id, qty - 1)}
+                      aria-label={`减少${dish.name}`}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       className="w-7 h-7 rounded-full bg-muted/80 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted transition-colors shadow-sm"
@@ -515,6 +530,8 @@ function DishCard({ dish, qty, dishIndex, addToCart, updateQuantity }: DishCardP
                     {/* 增加按钮 */}
                     <motion.button
                       onClick={() => addToCart(dish)}
+                      aria-label={`增加${dish.name}`}
+                      disabled={qty >= 99}
                       whileHover={{ scale: 1.1, rotate: 90 }}
                       whileTap={{ scale: 0.9 }}
                       className="w-7 h-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 relative overflow-hidden"
