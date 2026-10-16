@@ -7,7 +7,6 @@ export type { CartItem } from "../lib/cart-storage";
 interface CartContextType {
   cart: CartItem[];
   addToCart: (dish: Dish) => void;
-  removeFromCart: (dishId: string) => void;
   updateQuantity: (dishId: string, quantity: number) => void;
   clearCart: () => void;
   replaceCart: (items: CartItem[]) => void;
@@ -58,7 +57,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return [...previous, { ...dish, quantity: 1 }];
     });
   }, [changeCart]);
-  const removeFromCart = useCallback((id: string) => changeCart(previous => previous.filter(item => item.id !== id)), [changeCart]);
   const updateQuantity = useCallback((id: string, quantity: number) => {
     if (!Number.isInteger(quantity) || quantity > 99) return;
     changeCart(previous => quantity <= 0 ? previous.filter(item => item.id !== id) : previous.map(item => item.id === id ? { ...item, quantity } : item));
@@ -75,7 +73,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const cart = snapshot.cart;
   const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
   const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + (item.priceCents ?? Math.round(item.price * 100)) * item.quantity, 0) / 100, [cart]);
-  return <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, replaceCart, consumeItems, getCartSnapshot: readCartSnapshot, totalItems, totalPrice }}>{children}</CartContext.Provider>;
+  return <CartContext.Provider value={{ cart, addToCart, updateQuantity, clearCart, replaceCart, consumeItems, getCartSnapshot: readCartSnapshot, totalItems, totalPrice }}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
