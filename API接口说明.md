@@ -1,925 +1,298 @@
-# 🔌 甜蜜小厨 - API 接口分析报告
+# API 接口说明
 
-> 2026-10-16 更新：Express + MySQL 后端已实现，React 顾客前端已接入登录、动态菜单、下单、模拟支付和历史订单。实际可用接口、字段和错误码见 [已实现接口文档](docs/backend-api.md)，使用见 [前端接入说明](docs/frontend-integration.md)，启动见 [后端说明](server/README.md)。下文保留为早期分析和接口草案，其中“没有后端”、JWT 及部分接口路径已不代表当前实现。
+更新日期：2026-10-16。本文对应 [server/src/app.ts](server/src/app.ts) 中的实际实现，提供接口索引、常用请求和调用规则。字段边界与统计细节见 [详细接口文档](docs/backend-api.md)，可执行请求见 [server/requests.http](server/requests.http)。
 
-## 📊 项目现状分析
+## 1. 地址与通用约定
 
-### ⚠️ 重要发现：当前项目**没有真实的后端 API 接口**
+| 环境 | API 基础地址 |
+| --- | --- |
+| 在线版本 | `https://diandan-app-gike2022.onrender.com/api` |
+| 本机后端 | `http://127.0.0.1:3001/api` |
+| 本机前端 | 使用相对地址 `/api`，由 Vite 代理至后端 |
 
-你的项目目前是一个**纯前端应用**，所有数据都存储在**浏览器本地**（localStorage），没有与后端服务器进行任何 HTTP 通信。
+下方路径均相对于 API 基础地址。订单 ID 是 UUID，菜品 ID 可能是 `h1` 等资源 ID，不能混用。
 
----
+- 除退出和图片上传外，写接口使用 `Content-Type: application/json`。
+- 登录接口返回的令牌通过 `Authorization: Bearer <token>` 发送，不放在查询参数里。
+- 金额字段 `*Cents` 为整数分，例如 `2500` 表示 25 元；订单由后端计价。
+- 日期时间返回 UTC ISO 字符串；商家按日期查询与营业统计使用北京时间自然日。
+- 成功响应直接返回业务对象，如 `{user, token, expiresAt}`、`{order}`，没有统一的 `code/message/data` 外层。
+- 分页列表返回 `{items, total, page, pageSize}`；默认第 1 页、每页 20 条，每页最多 100 条。
+- 参数验证失败返回 JSON 错误；未实现的购物车服务、地址簿、真实支付回调不属于当前接口。
 
-## 🗂️ 当前数据存储方式
+## 2. 接口清单
 
-### 1. **菜单数据** - 硬编码在前端
-**位置**: `src/data/menu.ts`  
-**存储方式**: 静态 TypeScript 数组  
-**数据类型**: 
-```typescript
-{
-  id: string,
-  name: string,
-  description: string,
-  price: number,
-  image: string,
-  category: string
-}
-```
+### 公开访问与账号
 
-**特点**:
-- ✅ 无需网络请求，加载速度快
-- ❌ 无法动态更新菜单
-- ❌ 所有用户看到的菜单完全相同
-- ❌ 修改菜单需要重新部署前端代码
+| 方法 | 路径 | 身份 | 功能 |
+| --- | --- | --- | --- |
+| GET | /health | 公开 | 数据库连通性和支付模式 |
+| POST | /auth/register | 公开 | 注册顾客并返回会话 |
+| POST | /auth/login | 公开 | 账号密码登录 |
+| GET | /auth/me | 已登录 | 当前账号 |
+| PATCH | /auth/me | 已登录 | 修改本人的昵称与电话 |
+| POST | /auth/password | 已登录 | 校验原密码、改密并轮换会话 |
+| POST | /auth/logout | 已登录 | 吊销当前会话，返回 204 |
+| GET | /categories | 公开 | 启用分类 |
+| GET | /menu | 公开 | 上架菜单，含售罄标记 |
+| GET | /menu/:id | 公开 | 上架菜品详情 |
+| GET | /uploads/menu/:filename | 公开 | 上传后的 WebP 图片 |
 
----
+### 顾客订单
 
-### 2. **购物车数据** - 浏览器内存
-**位置**: `src/context/CartContext.tsx`  
-**存储方式**: React Context + useState  
-**生命周期**: 页面刷新后丢失（除非手动实现 localStorage 持久化）
+| 方法 | 路径 | 身份 | 功能 |
+| --- | --- | --- | --- |
+| POST | /orders | 已登录 | 幂等下单 |
+| GET | /orders | 已登录 | 本人的分页订单 |
+| GET | /orders/:id | 已登录 | 本人订单详情；管理员可读取全部 |
+| POST | /orders/:id/cancel | 已登录 | 取消本人的未付款订单 |
+| POST | /orders/:id/demo-payment | 已登录 | 对本人订单执行模拟付款 |
 
-**当前功能**:
-- `addToCart(dish)` - 添加菜品到购物车
-- `removeFromCart(dishId)` - 从购物车移除菜品
-- `updateQuantity(dishId, quantity)` - 更新菜品数量
-- `clearCart()` - 清空购物车
-- `totalItems` - 计算总数量
-- `totalPrice` - 计算总价
+### 商家管理
 
-**特点**:
-- ✅ 响应速度快，无延迟
-- ❌ 数据仅存在于当前浏览器
-- ❌ 无法跨设备同步
-- ❌ 页面刷新后购物车清空
+以下接口均要求管理员令牌。
 
----
+| 方法 | 路径 | 功能 |
+| --- | --- | --- |
+| GET | /admin/categories | 全部分类 |
+| POST | /admin/categories | 新增分类 |
+| PATCH | /admin/categories/:id | 修改分类名称、排序及启用状态 |
+| GET | /admin/menu | 全部菜品，包含停售菜品 |
+| POST | /admin/menu | 新增菜品 |
+| PATCH | /admin/menu/:id | 编辑菜品、价格、上架与售罄状态 |
+| DELETE | /admin/menu/:id | 停售菜品，保留历史引用 |
+| GET | /admin/orders | 组合查询全部订单 |
+| GET | /admin/orders/summary | 全量订单数与金额汇总 |
+| GET | /admin/orders/notifications | 完整待接单提醒快照 |
+| PATCH | /admin/orders/:id/status | 接单、配送、完成或拒单 |
+| GET | /admin/statistics | 日期范围营业统计 |
+| POST | /admin/uploads/images | 上传并转换图片 |
 
-### 3. **订单数据** - localStorage
-**位置**: `src/pages/orders.tsx`  
-**存储方式**: `localStorage.setItem("order_history", JSON.stringify(orders))`  
-**数据结构**:
-```typescript
-{
-  id: string,              // 订单ID（时间戳）
-  date: string,            // 下单时间（ISO格式）
-  items: Array<{           // 订单商品列表
-    name: string,
-    quantity: number,
-    price: number
-  }>,
-  total: number,           // 订单总价
-  name: string,            // 顾客姓名
-  address: string,         // 配送地址
-  notes: string,           // 订单备注
-  payMethod: string        // 支付方式（wechat/alipay）
-}
-```
+## 3. 注册、登录与会话
 
-**当前功能**:
-- `getSavedOrders()` - 从 localStorage 读取订单历史
-- `saveOrder(order)` - 保存新订单到 localStorage
-- 最多保存 20 条订单记录
+注册请求：
 
-**特点**:
-- ✅ 数据持久化，刷新页面不丢失
-- ❌ 数据仅存在于当前浏览器
-- ❌ 无法跨设备查看订单
-- ❌ 清除浏览器数据后订单丢失
-- ❌ 商家无法看到顾客的订单
-
----
-
-## 🚫 当前项目缺少的功能
-
-由于没有后端 API，以下功能**无法实现**：
-
-### 1. 商家端功能
-- ❌ 商家无法接收顾客订单
-- ❌ 商家无法管理菜单（增删改查）
-- ❌ 商家无法查看订单统计
-- ❌ 商家无法更新订单状态
-
-### 2. 用户端功能
-- ❌ 用户无法跨设备查看订单
-- ❌ 用户无法实时查看订单状态
-- ❌ 用户无法收到订单通知
-- ❌ 用户无法进行真实支付
-
-### 3. 数据管理
-- ❌ 订单数据无法统一管理
-- ❌ 菜单价格无法动态调整
-- ❌ 库存无法实时更新
-- ❌ 数据无法备份和恢复
-
----
-
-## 🎯 如果要接入后端，需要哪些 API？
-
-以下是一个完整的点餐系统应该具备的 API 接口设计：
-
----
-
-## 📋 API 接口设计方案
-
-### 基础配置
-```
-BASE_URL: https://api.sweetkitchen.com/v1
-认证方式: JWT Token (Authorization: Bearer <token>)
-数据格式: JSON
-```
-
----
-
-## 1️⃣ 菜单相关 API
-
-### 1.1 获取菜单列表
 ```http
-GET /menu
-```
+POST /api/auth/register
+Content-Type: application/json
 
-**请求参数**:
-```typescript
 {
-  category?: string,  // 可选，筛选分类
-  page?: number,      // 可选，分页页码
-  limit?: number      // 可选，每页数量
+  "username": "student01",
+  "displayName": "演示同学",
+  "phone": "13800000000",
+  "password": "Student123!"
 }
 ```
 
-**响应示例**:
+账号为 3–32 位字母、数字或下划线，去除首尾空白并转为小写；昵称为 1–80 字符，电话选填，密码为 8–128 字符。注册返回 201，角色固定为 `customer`；账号重复返回 `409 USERNAME_TAKEN`。
+
+登录请求体：
+
 ```json
 {
-  "code": 200,
-  "message": "success",
-  "data": {
-    "items": [
-      {
-        "id": "dish_001",
-        "name": "心心相印双人套餐",
-        "description": "浪漫双人份，含主菜+甜品+饮品",
-        "price": 128.00,
-        "image": "https://cdn.example.com/dish_001.jpg",
-        "category": "浪漫主菜",
-        "stock": 50,
-        "isAvailable": true,
-        "tags": ["热销", "推荐"]
-      }
-    ],
-    "total": 16,
-    "page": 1,
-    "limit": 20
+  "username": "demo",
+  "password": "Customer12345!"
+}
+```
+
+注册和登录返回 `{user, token, expiresAt}`。其中 `user` 包含 `id/username/displayName/phone/role`；`token` 是 64 位十六进制随机会话令牌，默认有效期 7 天。数据库只保存令牌摘要，接口不返回密码摘要。
+
+后续请求示例：
+
+```http
+GET /api/auth/me
+Authorization: Bearer <替换为登录返回的token>
+```
+
+修改资料：`PATCH /auth/me`，请求体为：
+
+```json
+{
+  "displayName": "新的昵称",
+  "phone": null
+}
+```
+
+两个字段都需提交。电话可为有效号码、空字符串或 `null`；后两者用于清空。响应为 `{user}`，不允许修改账号、ID 或角色。
+
+修改密码：`POST /auth/password`，请求体为：
+
+```json
+{
+  "currentPassword": "Student123!",
+  "newPassword": "StudentNew123!"
+}
+```
+
+新旧密码不能相同。成功后返回新会话，撤销该用户全部旧会话，客户端必须立即替换 token。确认密码只在前端校验，不传给接口。退出使用 `POST /auth/logout`，成功返回 204，无 JSON 响应体。
+
+默认限额：登录与注册共用每 IP 每 15 分钟 30 次，修改密码单独为每 IP 每 15 分钟 10 次。
+
+## 4. 菜单查询与维护
+
+公开菜单支持 `categoryId/search/page/pageSize`，例如：
+
+```http
+GET /api/menu?categoryId=main&search=红烧&page=1&pageSize=20
+```
+
+分类响应为 `{categories}`；菜单列表使用通用分页结构，详情为 `{dish}`。菜品包括 `id/categoryId/category/name/description/priceCents/price/imageUrl/soldOut/isActive/sortOrder/version`。金额计算使用 `priceCents`。
+
+新增分类请求为 `{name, sortOrder?, isActive?}`。停用分类会隐藏该分类下的公开菜品，并阻止新订单购买。
+
+新增菜品请求示例：
+
+```json
+{
+  "categoryId": "main",
+  "name": "今日新菜",
+  "description": "课程演示菜品",
+  "priceCents": 2500,
+  "imageUrl": "",
+  "soldOut": false,
+  "isActive": true,
+  "sortOrder": 20
+}
+```
+
+`priceCents` 为 1–1000000 的整数。图片接受空字符串、HTTP/HTTPS 地址或上传接口返回的规范路径。
+
+编辑分类、菜品时使用 PATCH，至少提交一个业务修改字段。建议同时提交查询到的 `expectedVersion`：
+
+```json
+{
+  "priceCents": 2600,
+  "expectedVersion": 1
+}
+```
+
+版本不一致返回 `409 VERSION_CONFLICT`，重新读取后再编辑。`soldOut=true` 表示仍展示但不可购买，`isActive=false` 表示下架。
+
+新增分类和菜品可传 `Idempotency-Key`：首次返回 201，内容相同的重试返回 200，并带 `created` 标记；相同键换内容返回 409。现有商家页面已使用此能力。
+
+## 5. 创建与查询订单
+
+下单必须携带 `Idempotency-Key`，格式为 8–128 位字母、数字、下划线或短横线。每笔新订单使用新键，同一次请求重试复用原键与原始内容。
+
+```http
+POST /api/orders
+Authorization: Bearer <token>
+Content-Type: application/json
+Idempotency-Key: demo-order-20261016-001
+
+{
+  "items": [{"dishId": "h1", "quantity": 1}],
+  "name": "演示顾客",
+  "phone": "13800000000",
+  "address": "课程演示虚构地址",
+  "notes": "少辣",
+  "payMethod": "wechat"
+}
+```
+
+每单 1–50 种不同菜品，每种 1–99 份，相同菜品必须合并数量。`payMethod` 为 `wechat` 或 `alipay`，仅表示模拟付款方式。请求不能提交价格、总额、状态或用户 ID。
+
+后端按有效菜单价格计价，每份包装费 50 分。首次返回 201 `{created: true, order}`；同一用户、键和内容重试返回 200 `{created: false, order}`；相同键换内容返回 `409 IDEMPOTENCY_CONFLICT`。
+
+订单的主要字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `id/orderNumber` | 内部 UUID / 展示用订单号 |
+| `name/phone/address/notes` | 下单时收货信息快照 |
+| `status/paymentStatus/payMethod` | 订单状态、付款状态、模拟方式 |
+| `subtotalCents/packingFeeCents/totalCents/totalItems` | 菜品小计、包装费、合计、总份数 |
+| `createdAt/updatedAt/paymentExpiresAt/serverTime` | UTC 时间、付款截止时间与服务端当前时间 |
+| `cancelReason` | 取消原因，未取消时为 null |
+| `items` | 商品名称、图片、单价、数量与明细金额快照 |
+| `payments` | 该订单的模拟付款、退款记录 |
+
+顾客列表支持 `status/page/pageSize`。详情返回 `{order}`；读取其他顾客的订单返回 404。
+
+商家列表另支持 `orderNumber/dateFrom/dateTo`，例如：
+
+```http
+GET /api/admin/orders?orderNumber=SK&dateFrom=2026-10-16&dateTo=2026-10-16&status=pending_acceptance&page=1&pageSize=20
+```
+
+订单号支持不区分大小写的完整或部分匹配，最多 40 位字母数字；日期按北京时间的下单时间筛选，包含结束日整天，可只传一端。开始日不能晚于结束日。
+
+## 6. 模拟支付、取消与订单状态
+
+正常状态顺序：
+
+```text
+pending_payment → pending_acceptance → preparing → delivering → completed
+待付款            待接单                制作中       配送中        已完成
+```
+
+| 操作 | 接口与请求体 | 结果 |
+| --- | --- | --- |
+| 模拟付款成功 | `POST /orders/:id/demo-payment`，`{"outcome":"success"}` | 待接单，支付状态 paid |
+| 模拟付款失败 | 同上，`{"outcome":"failed"}` | 保持待付款，可在期限内重试 |
+| 顾客取消 | `POST /orders/:id/cancel`，`{"reason":"计划有变"}` 或 `{}` | 仅未付款订单可取消 |
+| 商家接单 | `PATCH /admin/orders/:id/status`，`{"status":"preparing"}` | 进入制作中 |
+| 开始配送 | 同上，`{"status":"delivering"}` | 进入配送中 |
+| 完成订单 | 同上，`{"status":"completed"}` | 进入已完成 |
+| 商家拒单 | 同上，`{"status":"cancelled","reason":"今日打烊"}` | 仅已付款待接单订单可拒单，记录模拟退款 |
+
+模拟支付响应为 `{mode: "demo", order}`，其他状态操作返回 `{order}`。支付状态为 `unpaid/paid/refunded`。付款和退款重试不会重复记成功记录，商家不能跳过阶段或回退。
+
+默认下单后 900 秒到期。到期未付款订单变为 `cancelled`，原因是“付款超时自动取消”，支付状态仍为 unpaid，不生成退款。付款事务取得锁后再次检查截止时间，到期返回 `409 PAYMENT_EXPIRED`。
+
+## 7. 提醒、统计与图片
+
+### 新订单提醒
+
+`GET /admin/orders/notifications` 返回 `{pending: [{id, orderNumber}], total}`，包含全部已付款且待接单订单，不受订单页筛选与分页影响。商家页面每 5 秒读取，首次成功同步作为已有订单基线，之后按 ID 识别新增订单。
+
+### 营业统计
+
+`GET /admin/statistics` 不传参数时默认最近 7 个北京时间自然日；自定义需同时传 `dateFrom/dateTo`，含结束日，最多 92 天。
+
+返回 `dateFrom/dateTo/generatedAt/summary/daily/statuses/topDishes`。营业额为范围内下单、当前已完成且已付款订单的总额，含包装费；热门菜品金额不含包装费。未付款、未完成、已退款订单不计入营业额，统计并非按收款日划分的财务流水。
+
+### 图片上传与读取
+
+管理员向 `POST /admin/uploads/images` 直接发送文件二进制，请求头使用 `image/jpeg`、`image/png` 或 `image/webp`，不是 multipart 或 JSON。单张最多 5 MiB、2500 万像素，不支持 SVG 和动画；每 IP 每 15 分钟最多上传 30 次。
+
+后端转换为最长边不超过 1600px 的 WebP，返回 201：
+
+```json
+{
+  "imageUrl": "/api/uploads/menu/<64位内容摘要>.webp",
+  "size": 12345
+}
+```
+
+响应中的 `size` 为处理后字节数，示例摘要需替换为实际返回值。上传完成后，还需将 `imageUrl` 保存到菜品。图片通过返回路径匿名读取；云端内容保存在 MySQL，本机默认使用文件存储。
+
+## 8. 错误与客户端处理
+
+错误结构示例：
+
+```json
+{
+  "error": {
+    "code": "PAYMENT_EXPIRED",
+    "message": "订单付款已超时"
   }
 }
 ```
 
-**使用场景**: 首页加载菜单列表
-
----
-
-### 1.2 获取单个菜品详情
-```http
-GET /menu/:dishId
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "id": "dish_001",
-    "name": "心心相印双人套餐",
-    "description": "浪漫双人份，含主菜+甜品+饮品",
-    "price": 128.00,
-    "image": "https://cdn.example.com/dish_001.jpg",
-    "category": "浪漫主菜",
-    "stock": 50,
-    "isAvailable": true,
-    "tags": ["热销", "推荐"],
-    "ingredients": ["牛排", "意面", "沙拉"],
-    "allergens": ["麸质", "乳制品"],
-    "calories": 850
-  }
-}
-```
-
-**使用场景**: 查看菜品详情页
-
----
-
-## 2️⃣ 购物车相关 API
-
-### 2.1 获取购物车
-```http
-GET /cart
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "items": [
-      {
-        "id": "cart_item_001",
-        "dishId": "dish_001",
-        "name": "心心相印双人套餐",
-        "price": 128.00,
-        "quantity": 2,
-        "image": "https://cdn.example.com/dish_001.jpg"
-      }
-    ],
-    "totalItems": 2,
-    "totalPrice": 256.00
-  }
-}
-```
-
-**使用场景**: 页面加载时同步购物车
-
----
-
-### 2.2 添加商品到购物车
-```http
-POST /cart/add
-```
-
-**请求体**:
-```json
-{
-  "dishId": "dish_001",
-  "quantity": 1
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "添加成功",
-  "data": {
-    "cartItemId": "cart_item_001",
-    "totalItems": 3,
-    "totalPrice": 384.00
-  }
-}
-```
-
-**使用场景**: 点击"加入购物车"按钮
-
----
-
-### 2.3 更新购物车商品数量
-```http
-PUT /cart/:cartItemId
-```
-
-**请求体**:
-```json
-{
-  "quantity": 3
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "更新成功",
-  "data": {
-    "totalItems": 5,
-    "totalPrice": 512.00
-  }
-}
-```
-
-**使用场景**: 购物车页面修改数量
-
----
-
-### 2.4 删除购物车商品
-```http
-DELETE /cart/:cartItemId
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "删除成功",
-  "data": {
-    "totalItems": 2,
-    "totalPrice": 256.00
-  }
-}
-```
-
-**使用场景**: 购物车页面删除商品
-
----
-
-### 2.5 清空购物车
-```http
-DELETE /cart/clear
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "购物车已清空"
-}
-```
-
-**使用场景**: 订单提交成功后清空购物车
-
----
-
-## 3️⃣ 订单相关 API
-
-### 3.1 创建订单
-```http
-POST /orders
-```
-
-**请求体**:
-```json
-{
-  "items": [
-    {
-      "dishId": "dish_001",
-      "quantity": 2,
-      "price": 128.00
-    }
-  ],
-  "customerInfo": {
-    "name": "张三",
-    "phone": "13800138000",
-    "address": "北京市朝阳区xx路xx号"
-  },
-  "notes": "少辣，不加葱",
-  "paymentMethod": "wechat",
-  "totalAmount": 257.00
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "订单创建成功",
-  "data": {
-    "orderId": "order_20260421_001",
-    "orderNumber": "202604210001",
-    "status": "pending",
-    "paymentUrl": "https://pay.example.com/qr/xxx",
-    "createdAt": "2026-04-21T10:30:00Z"
-  }
-}
-```
-
-**使用场景**: 结算页面提交订单
-
----
-
-### 3.2 获取订单列表
-```http
-GET /orders
-```
-
-**请求参数**:
-```typescript
-{
-  status?: string,    // 可选，筛选状态
-  page?: number,      // 可选，分页页码
-  limit?: number      // 可选，每页数量
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "orders": [
-      {
-        "id": "order_20260421_001",
-        "orderNumber": "202604210001",
-        "status": "completed",
-        "items": [
-          {
-            "name": "心心相印双人套餐",
-            "quantity": 2,
-            "price": 128.00
-          }
-        ],
-        "totalAmount": 257.00,
-        "customerInfo": {
-          "name": "张三",
-          "phone": "13800138000",
-          "address": "北京市朝阳区xx路xx号"
-        },
-        "notes": "少辣，不加葱",
-        "paymentMethod": "wechat",
-        "createdAt": "2026-04-21T10:30:00Z",
-        "updatedAt": "2026-04-21T11:00:00Z"
-      }
-    ],
-    "total": 10,
-    "page": 1,
-    "limit": 20
-  }
-}
-```
-
-**使用场景**: 订单历史页面
-
----
-
-### 3.3 获取订单详情
-```http
-GET /orders/:orderId
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "id": "order_20260421_001",
-    "orderNumber": "202604210001",
-    "status": "completed",
-    "statusHistory": [
-      {
-        "status": "pending",
-        "timestamp": "2026-04-21T10:30:00Z"
-      },
-      {
-        "status": "confirmed",
-        "timestamp": "2026-04-21T10:32:00Z"
-      },
-      {
-        "status": "preparing",
-        "timestamp": "2026-04-21T10:35:00Z"
-      },
-      {
-        "status": "completed",
-        "timestamp": "2026-04-21T11:00:00Z"
-      }
-    ],
-    "items": [...],
-    "totalAmount": 257.00,
-    "customerInfo": {...},
-    "notes": "少辣，不加葱",
-    "paymentMethod": "wechat",
-    "createdAt": "2026-04-21T10:30:00Z"
-  }
-}
-```
-
-**使用场景**: 订单详情页面
-
----
-
-### 3.4 取消订单
-```http
-POST /orders/:orderId/cancel
-```
-
-**请求体**:
-```json
-{
-  "reason": "不想要了"
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "订单已取消",
-  "data": {
-    "orderId": "order_20260421_001",
-    "status": "cancelled",
-    "refundAmount": 257.00
-  }
-}
-```
-
-**使用场景**: 订单详情页面取消订单
-
----
-
-## 4️⃣ 支付相关 API
-
-### 4.1 创建支付订单
-```http
-POST /payment/create
-```
-
-**请求体**:
-```json
-{
-  "orderId": "order_20260421_001",
-  "paymentMethod": "wechat",
-  "amount": 257.00
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "支付订单创建成功",
-  "data": {
-    "paymentId": "pay_001",
-    "qrCodeUrl": "https://cdn.example.com/qr/pay_001.png",
-    "expireAt": "2026-04-21T10:45:00Z"
-  }
-}
-```
-
-**使用场景**: 结算页面生成支付二维码
-
----
-
-### 4.2 查询支付状态
-```http
-GET /payment/:paymentId/status
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "paymentId": "pay_001",
-    "status": "paid",
-    "paidAt": "2026-04-21T10:35:00Z",
-    "amount": 257.00
-  }
-}
-```
-
-**使用场景**: 轮询查询支付是否完成
-
----
-
-### 4.3 支付回调（Webhook）
-```http
-POST /payment/webhook
-```
-
-**请求体**（由支付平台发送）:
-```json
-{
-  "paymentId": "pay_001",
-  "orderId": "order_20260421_001",
-  "status": "paid",
-  "amount": 257.00,
-  "paidAt": "2026-04-21T10:35:00Z",
-  "signature": "xxx"
-}
-```
-
-**使用场景**: 支付平台通知支付结果
-
----
-
-## 5️⃣ 用户相关 API
-
-### 5.1 用户注册
-```http
-POST /auth/register
-```
-
-**请求体**:
-```json
-{
-  "phone": "13800138000",
-  "password": "123456",
-  "name": "张三"
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "注册成功",
-  "data": {
-    "userId": "user_001",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "expiresIn": 7200
-  }
-}
-```
-
----
-
-### 5.2 用户登录
-```http
-POST /auth/login
-```
-
-**请求体**:
-```json
-{
-  "phone": "13800138000",
-  "password": "123456"
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "userId": "user_001",
-    "name": "张三",
-    "phone": "13800138000",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "expiresIn": 7200
-  }
-}
-```
-
----
-
-### 5.3 获取用户信息
-```http
-GET /user/profile
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "userId": "user_001",
-    "name": "张三",
-    "phone": "13800138000",
-    "avatar": "https://cdn.example.com/avatar/user_001.jpg",
-    "addresses": [
-      {
-        "id": "addr_001",
-        "name": "张三",
-        "phone": "13800138000",
-        "address": "北京市朝阳区xx路xx号",
-        "isDefault": true
-      }
-    ]
-  }
-}
-```
-
----
-
-## 6️⃣ 地址管理 API
-
-### 6.1 获取地址列表
-```http
-GET /addresses
-```
-
-### 6.2 添加地址
-```http
-POST /addresses
-```
-
-### 6.3 更新地址
-```http
-PUT /addresses/:addressId
-```
-
-### 6.4 删除地址
-```http
-DELETE /addresses/:addressId
-```
-
----
-
-## 📊 API 状态码规范
-
-```typescript
-200 - 成功
-201 - 创建成功
-400 - 请求参数错误
-401 - 未授权（需要登录）
-403 - 禁止访问（权限不足）
-404 - 资源不存在
-500 - 服务器内部错误
-```
-
----
-
-## 🔧 如何在项目中集成 API？
-
-### 方案一：使用 Axios（推荐）
-
-#### 1. 安装依赖
-```bash
-npm install axios
-```
-
-#### 2. 创建 API 配置文件
-**文件**: `src/lib/api.ts`
-
-```typescript
-import axios from 'axios';
-
-// 创建 axios 实例
-const api = axios.create({
-  baseURL: 'https://api.sweetkitchen.com/v1',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// 请求拦截器（添加 Token）
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// 响应拦截器（统一错误处理）
-api.interceptors.response.use(
-  (response) => {
-    return response.data;
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token 过期，跳转登录
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default api;
-```
-
-#### 3. 创建 API 服务文件
-**文件**: `src/services/menuService.ts`
-
-```typescript
-import api from '@/lib/api';
-
-export const menuService = {
-  // 获取菜单列表
-  getMenuList: (params?: { category?: string }) => {
-    return api.get('/menu', { params });
-  },
-
-  // 获取菜品详情
-  getDishDetail: (dishId: string) => {
-    return api.get(`/menu/${dishId}`);
-  }
-};
-```
-
-**文件**: `src/services/orderService.ts`
-
-```typescript
-import api from '@/lib/api';
-
-export const orderService = {
-  // 创建订单
-  createOrder: (data: any) => {
-    return api.post('/orders', data);
-  },
-
-  // 获取订单列表
-  getOrderList: (params?: { page?: number; limit?: number }) => {
-    return api.get('/orders', { params });
-  },
-
-  // 获取订单详情
-  getOrderDetail: (orderId: string) => {
-    return api.get(`/orders/${orderId}`);
-  },
-
-  // 取消订单
-  cancelOrder: (orderId: string, reason: string) => {
-    return api.post(`/orders/${orderId}/cancel`, { reason });
-  }
-};
-```
-
-#### 4. 在组件中使用（配合 React Query）
-
-**文件**: `src/pages/home.tsx`
-
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { menuService } from '@/services/menuService';
-
-export default function Home() {
-  // 使用 React Query 获取菜单数据
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['menu'],
-    queryFn: () => menuService.getMenuList()
-  });
-
-  if (isLoading) return <div>加载中...</div>;
-  if (error) return <div>加载失败</div>;
-
-  return (
-    <div>
-      {data?.data?.items.map(dish => (
-        <div key={dish.id}>{dish.name}</div>
-      ))}
-    </div>
-  );
-}
-```
-
----
-
-### 方案二：使用原生 Fetch
-
-**文件**: `src/lib/fetch.ts`
-
-```typescript
-const BASE_URL = 'https://api.sweetkitchen.com/v1';
-
-async function request(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token');
-  
-  const response = await fetch(`${BASE_URL}${url}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  return response.json();
-}
-
-export const api = {
-  get: (url: string) => request(url),
-  post: (url: string, data: any) => request(url, {
-    method: 'POST',
-    body: JSON.stringify(data)
-  }),
-  put: (url: string, data: any) => request(url, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  }),
-  delete: (url: string) => request(url, { method: 'DELETE' })
-};
-```
-
----
-
-## 📝 总结
-
-### 当前状态
-- ❌ **没有任何后端 API 接口**
-- ✅ 所有数据存储在前端（localStorage + 内存）
-- ✅ 适合作为原型演示或学习项目
-
-### 如果要上线运营
-你需要：
-1. ✅ 开发完整的后端 API（Node.js / Python / Java 等）
-2. ✅ 集成真实的支付接口（微信支付 / 支付宝）
-3. ✅ 实现用户认证系统（JWT / Session）
-4. ✅ 部署数据库（MySQL / PostgreSQL / MongoDB）
-5. ✅ 实现订单推送通知（WebSocket / 轮询）
-6. ✅ 添加商家管理后台
-
-### 推荐技术栈
-**后端**: Node.js + Express + TypeScript  
-**数据库**: PostgreSQL + Prisma ORM  
-**认证**: JWT + bcrypt  
-**支付**: 微信支付 SDK + 支付宝 SDK  
-**部署**: Docker + Nginx + PM2
-
----
-
-**文档生成时间**: 2026-04-21  
-**分析者**: Kiro AI Assistant
+文案以实际响应为准；校验错误可能附带 `error.details`，客户端根据 HTTP 状态和 `error.code` 判断。
+
+| HTTP 状态 | 常见情况 |
+| --- | --- |
+| 400 | 参数、JSON、幂等键、日期或原密码错误 |
+| 401 | 未登录、账号密码错误或会话失效 |
+| 403 | 无管理员权限、来源不允许或模拟支付未开启 |
+| 404 | 资源不存在、无权查看的顾客订单 |
+| 409 | 重名、版本冲突、重复键内容变化、菜品不可购买或订单状态冲突 |
+| 413 | JSON 超过 100 KB，或图片超过 5 MiB |
+| 415 | 请求类型或上传格式不支持 |
+| 429 | 登录注册、改密或图片上传触发限流 |
+| 500 | 内部错误；不向客户端暴露 SQL 和堆栈 |
+| 503 | 健康检查发现数据库不可用 |
+
+前端当前使用原生 Fetch 封装 [src/lib/api.ts](src/lib/api.ts) 和 [src/lib/admin-api.ts](src/lib/admin-api.ts)，默认超时 15 秒。认证失效后重新登录；下单结果不明时保留原请求和幂等键重试，不要立即新建另一个键。

@@ -1,72 +1,93 @@
 # 甜蜜小厨点餐系统
 
-用于课程设计和作品演示的单店点餐系统。
+面向课程设计和作品演示的单店点餐系统，包含 React 顾客页面、商家工作台、Express 后端和 MySQL 数据库。页面采用粉紫主题、星空背景和圆角卡片。
 
-在线体验：[甜蜜小厨](https://diandan-app-gike2022.onrender.com)，[商家入口](https://diandan-app-gike2022.onrender.com/admin)。顾客可自行注册，或使用 `demo` / `Customer12345!`。免费服务闲置后首次打开可能需要等待约一分钟；支付均为模拟演示。云端管理员使用独立私密密码，详见 [部署说明](docs/cloud-deployment.md)。
+**在线体验**：[顾客首页](https://diandan-app-gike2022.onrender.com) · [注册账号](https://diandan-app-gike2022.onrender.com/register) · [商家工作台](https://diandan-app-gike2022.onrender.com/admin)
 
-## 已完成功能
+演示顾客账号为 `demo`，初始密码为 `Customer12345!`。云端管理员使用独立私密密码，见 [登录账号说明](登录账号说明.md)。所有付款和退款均为模拟，不会产生真实扣款。
 
-- 顾客前端：React + TypeScript + Vite，保留原有粉紫主题、星空背景和移动端页面风格。
-- 后端：`server/` 中的 Node.js + TypeScript + Express 服务，使用真实 MySQL 持久化。
-- 顾客页面已连接真实接口：注册、自动登录、登录与退出、动态菜单、购物车恢复、下单、模拟付款、订单详情与历史订单查询。
-- 支持待付款订单继续付款、取消订单和按最新菜单再来一单。
-- 未付款订单默认 15 分钟后自动取消，详情显示倒计时；后台持续扫描，付款接口也会检查截止时间。
-- 商家工作台：菜品新增编辑、售罄与上下架、分类维护、接单、配送、完成以及拒单模拟退款，服务端校验管理员权限。
-- 商家订单支持按完整/部分订单号、北京时间下单日期及状态组合查询；整个工作台每 5 秒检查新付款订单，显示待接单数量和去重提醒。
-- 营业统计：按北京时间下单日期查看营业额、单量、每日趋势、订单状态、模拟退款和热门菜品。
-- 菜品图片支持本机 JPG/PNG/WebP 上传、预览和保存，单张最多 5 MB；原有图片地址仍可使用。
-- 顾客和管理员均可维护昵称、联系电话并验证原密码修改密码，成功后撤销旧会话，当前页面继续登录。
-- 支付接口仅供模拟演示，所有支付记录的 provider 为 `demo`。
+## 功能概览
 
-## 本机启动
+| 使用者 | 已实现功能 |
+| --- | --- |
+| 顾客 | 注册登录、菜单与分类浏览、购物车、收货信息、下单、模拟支付、15 分钟未付款自动取消、订单详情与历史、再次购买 |
+| 商家 | 分类维护、菜品新增编辑、上下架与售罄、图片上传、按订单号/日期/状态查询、接单与配送完成、拒单模拟退款、新订单提醒、营业统计 |
+| 双方 | 昵称与联系电话维护、验证原密码修改密码、退出与会话管理 |
 
-本机数据库连接已配置在被 Git 忽略的 `server/.env`，使用独立的点餐账号，不使用 MySQL root 账号运行 API。
+菜单、账户、订单和模拟支付记录保存在 MySQL。浏览器保存购物车、登录令牌和请求恢复信息，订单历史以服务端查询结果为准。
+
+## 技术与部署
+
+| 部分 | 当前方案 |
+| --- | --- |
+| 前端 | React 18、TypeScript、Vite 5、Tailwind CSS 4、Wouter、TanStack Query |
+| 后端 | Node.js、TypeScript、Express 5、mysql2、Zod、sharp |
+| 数据库 | MySQL；使用 SQL 迁移管理表结构 |
+| 自动化验证 | Node.js 测试运行器、真实 MySQL 集成测试、Playwright |
+| 在线部署 | Render 托管前端与后端，Aiven 托管 MySQL；同一 HTTPS 地址提供页面和 API |
+
+云端上传图片保存在 MySQL，重新部署后仍可读取；本机默认使用文件存储。依赖与脚本以 [package.json](package.json) 和 [server/package.json](server/package.json) 为准。
+
+## 本机快速启动
+
+建议使用 Node.js 24，后端最低要求 Node.js 22；MySQL 要求 8.0.16 或以上。新机器先按 [部署说明](部署说明.md) 配置数据库和 `server/.env`，已有配置时保留原文件。
+
+在项目根目录运行：
 
 ```powershell
-# 项目根目录 D:\Project-My\laojiegang-order-app
-npm run install:api
+npm ci
+npm --prefix server ci
 npm run db:migrate
 npm run db:seed
+```
+
+打开两个终端，工作目录都设为项目根目录：
+
+```powershell
+# 终端一：后端
 npm run dev:api
 ```
 
-API 健康检查：<http://127.0.0.1:3001/api/health>。
-
-另开一个终端启动前端：
-
 ```powershell
-npm install
+# 终端二：前端
 npm run dev
 ```
 
-打开 [点餐首页](http://127.0.0.1:5173)，使用演示顾客账号 `demo`、密码 `Customer12345!` 登录。手机号、联系人和地址可在结算时填写；下单后在详情页选择模拟付款成功或失败，不会发生真实扣款。
+访问 [本机首页](http://127.0.0.1:5173)、[商家工作台](http://127.0.0.1:5173/admin) 或 [API 健康检查](http://127.0.0.1:3001/api/health)。Vite 自动将 `/api` 代理到本机 3001 端口。本机账号见 [登录账号说明](登录账号说明.md)。
 
-也可从登录页点击“注册账号”，或打开 [注册页](http://127.0.0.1:5173/register)。填写账号、昵称、可选联系电话及两次密码，成功后自动登录并保留购物车；从结算进入注册会自动回到结算。
+初始化只为新记录创建演示数据，再次执行不会覆盖已修改的密码、菜单或订单。
 
-商家打开 [商家工作台](http://127.0.0.1:5173/admin)，使用管理员账号 `admin`、密码 `Admin12345!` 登录。管理员也可从点餐首页左上角进入工作台；普通顾客账号无法访问管理页面。
+## 文档导航
 
-开发时 `/api` 自动代理到本机 3001 端口。前端可选配置见根目录 `.env.example`；数据库配置仍只保存在 `server/.env`。
+| 文档 | 主要用途 |
+| --- | --- |
+| [项目介绍](项目介绍.md) | 项目定位、功能、业务流程、技术架构和适用边界 |
+| [项目文件分析](项目文件分析.md) | 目录结构、关键文件、数据库迁移与代码阅读顺序 |
+| [API 接口说明](API接口说明.md) | 实际接口清单、请求示例、认证、状态和错误处理 |
+| [部署说明](部署说明.md) | 本机运行、Render + Aiven 部署、配置、更新与排查 |
+| [登录账号说明](登录账号说明.md) | 本机与云端账号、权限和修改密码说明 |
 
-## 文档与验证
+进一步阅读：[后端安装](server/README.md)、[接口细节](docs/backend-api.md)、[前端接入](docs/frontend-integration.md)、[商家操作](docs/merchant-guide.md)、[统计与图片操作](docs/statistics-images-account-guide.md)、[云端部署记录](docs/cloud-deployment.md)。
 
-- [后端安装、数据库与运行说明](server/README.md)
-- [前端使用、配置与端到端验证](docs/frontend-integration.md)
-- [商家页面使用和流程演示](docs/merchant-guide.md)
-- [营业统计、图片上传与个人资料操作](docs/statistics-images-account-guide.md)
-- [网站演示登录账号](登录账号说明.md)
-- [免费云端部署：Render 网站与 Aiven MySQL](docs/cloud-deployment.md)
-- [已实现接口、请求格式与业务规则](docs/backend-api.md)
-- [可在 REST Client 中运行的请求示例](server/requests.http)
-- [数据库 SQL 迁移](server/migrations/001_initial.sql)
-- [第一阶段设计](docs/superpowers/specs/2026-10-16-ordering-backend-design.md)
+## 检查与测试
+
+先在 `server/.env` 配置独立的 `TEST_DATABASE_URL`。测试库名须以 `_test` 或 `_test_十六进制后缀` 结尾，且不能与应用库同名。API 和浏览器测试会清理测试库业务数据，须顺序运行。
 
 ```powershell
+npm run typecheck
 npm run typecheck:api
 npm run test:api
-npm run build:api
-npm run typecheck
 npx playwright install chromium
 npm run test:e2e
+npm run build:api
 ```
 
-`test:api` 和 `test:e2e` 需要独立的 `TEST_DATABASE_URL`，会清理测试库内的点餐业务数据，不操作应用数据库。这两组测试请顺序执行。浏览器测试自动启动 3002/5174 测试服务。
+前端生产构建使用 `npm run build`，预览命令为 `npm run serve`。浏览器测试自动使用 3002/5174 端口。
+
+2026-10-16 上线验证记录：45 项后端测试、38 项浏览器测试通过；公网已验证注册、下单、模拟支付、商家操作、统计、上传、资料和改密，重新部署后订单与图片仍可读取。详见 [部署记录](docs/cloud-deployment.md)。
+
+## 演示范围
+
+当前支持单店演示，尚未接入真实支付、真实配送平台、短信找回密码和多商家入驻。Render 免费服务闲置后会休眠，重新打开可能等待约一分钟，说明见 [Render 免费服务文档](https://render.com/docs/free)。数据库和上传内容需按部署说明备份。
+
+文档更新日期：2026-10-16。
