@@ -2,7 +2,14 @@
 
 方案：Render Free Web Service 同时运行 Express API 和 React 构建产物，Aiven MySQL Free 持久保存业务数据及上传图片。访客使用同一个 HTTPS 网址访问页面和 `/api`，无需自购域名。页面风格和所有现有功能保持相同。
 
-本文件是部署配置与操作说明，不代表部署已经完成。公网网址应以 Render 创建服务后返回并验证的地址为准。
+2026-10-16 已部署并完成公网功能验证：
+
+- 网站：[甜蜜小厨](https://diandan-app-gike2022.onrender.com)
+- 管理：[商家工作台](https://diandan-app-gike2022.onrender.com/admin)
+- 状态：[API 健康检查](https://diandan-app-gike2022.onrender.com/api/health)
+- 服务管理：[Render 控制台](https://dashboard.render.com/web/srv-db8ug7vf3r2c73ffk7kg)
+
+Render 服务为 Free、Singapore，Aiven 数据库为 MySQL 8.4.11。云库从空库初始化，未复制本机顾客或订单。管理员私密登录说明保存在所有者本机 `.local/deploy/云端登录账号.md`。
 
 ## Aiven 数据库
 
@@ -62,6 +69,10 @@ npm run test:e2e
 npm run build:api
 npm run build
 ```
+
+本次验证：45 项后端测试、38 项浏览器测试通过，前后端类型检查与构建通过；`render.yaml` 通过 Render 官方 JSON Schema 校验。首次浏览器运行有 1 项在提醒关闭按钮处超时，单独重复 2 次及完整复跑全部通过，未修改提醒页面代码。
+
+公网实际验证通过注册、菜单加载、下单、模拟付款、商家登录及接单、配送完成、顾客历史订单、订单号查询、营业统计、MySQL 图片上传读取、个人资料保存和修改密码，未发现浏览器 JavaScript 异常；页面路由直达返回 200，未知 API 和缺失脚本返回 JSON 404。
 
 ## 免费方案的使用边界
 

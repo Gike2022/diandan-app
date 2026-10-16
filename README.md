@@ -2,6 +2,8 @@
 
 用于课程设计和作品演示的单店点餐系统。
 
+在线体验：[甜蜜小厨](https://diandan-app-gike2022.onrender.com)，[商家入口](https://diandan-app-gike2022.onrender.com/admin)。顾客可自行注册，或使用 `demo` / `Customer12345!`。免费服务闲置后首次打开可能需要等待约一分钟；支付均为模拟演示。云端管理员使用独立私密密码，详见 [部署说明](docs/cloud-deployment.md)。
+
 ## 已完成功能
 
 - 顾客前端：React + TypeScript + Vite，保留原有粉紫主题、星空背景和移动端页面风格。
